@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mariadb:10.6.4-focal
+    command: '--default-authentication-plugin=caching_sha2_password'
+    volumes:
+      - ./data/db:/var/lib/mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wordpress
+      - MYSQL_PASSWORD=${DB_WORDPRESS_PASSWORD}
+    expose:
+      - 3306
+      - 33060
+
+  wordpress:
+    image: wordpress:6.8.1-php8.4-apache
+    volumes:
+      - ./data/wp:/var/www/html
+    networks:
+      - default
+      - my-traefik-net
+    depends_on:
+      - db
+    # ports:
+    #   - 80:80
+    restart: always
+    environment:
+      - WORDPRESS_DB_HOST=db
+      - WORDPRESS_DB_USER=wordpress
+      - WORDPRESS_DB_PASSWORD=${DB_WORDPRESS_PASSWORD}
+      - WORDPRESS_DB_NAME=wordpress
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${DEPLOYMENT_HOST_NAME}`)
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=websecure
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true
+      - traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=letsencrypt
+      - traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80
+
+networks:
+  # Created by the website-traefik deployment
+  my-traefik-net:
+    external: true
